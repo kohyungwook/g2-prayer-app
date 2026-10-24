@@ -4,22 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>G2 월별 교인 기도수첩</title>
+  <!-- 엑셀 파일(.xlsx, .xls) 파싱 라이브러리 SheetJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #f4f6f9; color: #2d3748; }
     h2 { font-size: 1.25rem; margin-top: 0; color: #1a202c; }
+    h3 { font-size: 1.05rem; margin-top: 0; color: #2d3748; margin-bottom: 8px; }
     .card { background: #ffffff; padding: 14px; border-radius: 10px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 4px; }
+    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 6px; }
     select, input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.95rem; }
     button { width: 100%; padding: 12px; background: #3182ce; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; }
     button:active { background: #2b6cb0; }
     .status { font-size: 0.88rem; color: #718096; line-height: 1.4; }
     .badge { display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
     .active-badge { background: #c6f6d5; color: #22543d; }
+    .file-dropzone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 16px; text-align: center; background: #fafafa; margin-bottom: 10px; }
+    .file-dropzone input { margin-bottom: 0; }
+    .excel-guide { font-size: 0.8rem; color: #718096; line-height: 1.4; background: #edf2f7; padding: 8px; border-radius: 6px; margin-top: 6px; }
   </style>
 </head>
 <body>
   <h2>G2 월별 교인 기도수첩</h2>
 
+  <!-- 안경 및 음성인식 상태 카드 -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <span id="bridge-badge" class="badge">연결 대기 중</span>
@@ -31,17 +38,30 @@
     </div>
   </div>
 
+  <!-- 적용 월 선택 카드 -->
   <div class="card">
     <label for="month-select">조회 및 적용할 월 선택</label>
     <select id="month-select"></select>
   </div>
 
+  <!-- 엑셀 일괄 업로드 카드 -->
   <div class="card">
-    <h3>이번 달 기도제목 추가</h3>
+    <h3>엑셀 파일로 일괄 등록</h3>
+    <div class="file-dropzone">
+      <input type="file" id="excel-file-input" accept=".xlsx, .xls" />
+    </div>
+    <div class="excel-guide">
+      <b>* 엑셀 양식 안내:</b> 1행 머리글에 <code>이름</code>, <code>직분</code>, <code>기도제목</code> 열을 넣고 작성하시면 선택된 월에 일괄 반영됩니다.
+    </div>
+  </div>
+
+  <!-- 개별 수동 등록 카드 -->
+  <div class="card">
+    <h3>개별 직접 추가/수정</h3>
     <input type="text" id="input-name" placeholder="교인 성함 (예: 김철수)" />
     <input type="text" id="input-title" placeholder="직분 (예: 성도, 집사, 권사)" />
-    <textarea id="input-prayer" rows="3" placeholder="기도제목 입력 (2~3줄 권장)"></textarea>
-    <button id="btn-save">기도제목 저장</button>
+    <textarea id="input-prayer" rows="2" placeholder="기도제목 입력"></textarea>
+    <button id="btn-save">개별 저장</button>
   </div>
 
   <script>
@@ -218,6 +238,69 @@
       }
     }
 
+    // 엑셀 파일 업로드 처리 함수
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!rows || rows.length === 0) {
+            alert('엑셀 파일에 데이터가 없습니다.');
+            return;
+          }
+
+          let currentMonthGroup = monthlyData.find(m => m.month === currentMonth);
+          if (!currentMonthGroup) {
+            currentMonthGroup = { month: currentMonth, list: [] };
+            monthlyData.push(currentMonthGroup);
+          }
+
+          let addedCount = 0;
+          rows.forEach((row, index) => {
+            // 유연한 열 이름 매칭
+            const name = (row['이름'] || row['성함'] || row['교인이름'] || row['성명'] || '').toString().trim();
+            const title = (row['직분'] || row['직책'] || '성도').toString().trim();
+            const prayer = (row['기도제목'] || row['기도'] || row['내용'] || '').toString().trim();
+
+            if (name && prayer) {
+              const existing = currentMonthGroup.list.find(p => p.name === name);
+              if (existing) {
+                existing.title = title;
+                existing.prayer = prayer;
+              } else {
+                currentMonthGroup.list.push({
+                  id: `${Date.now()}_${index}`,
+                  name,
+                  title,
+                  prayer
+                });
+              }
+              addedCount++;
+            }
+          });
+
+          saveData();
+          updateMonthSelectorUI();
+          setActiveMonth(currentMonth);
+
+          alert(`${addedCount}명의 교인 기도제목이 [${currentMonth}] 목록에 성공적으로 등록되었습니다!`);
+          event.target.value = ''; // 초기화
+        } catch (error) {
+          console.error(error);
+          alert('엑셀 파일을 읽는 도중 오류가 발생했습니다. 파일 형식을 확인해주세요.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
     async function init() {
       loadData();
 
@@ -246,11 +329,16 @@
 
       initSTT();
 
+      // 엑셀 업로드 이벤트 연결
+      document.getElementById('excel-file-input')?.addEventListener('change', handleExcelUpload);
+
+      // 월 선택 드롭다운 변경 리스너
       const selector = document.getElementById('month-select');
       selector?.addEventListener('change', () => {
         setActiveMonth(selector.value);
       });
 
+      // 개별 직접 등록
       document.getElementById('btn-save')?.addEventListener('click', () => {
         const nameEl = document.getElementById('input-name');
         const titleEl = document.getElementById('input-title');
