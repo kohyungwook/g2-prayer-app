@@ -1,0 +1,12 @@
+{
+  "name": "g2-prayer-app",
+  "displayName": "기도수첩",
+  "version": "1.0.0",
+  "description": "음성인식 월별 교인 기도수첩",
+  "main": "index.html",
+  "category": "utilities",
+  "targets": ["g2"],
+  "permissions": [
+    "voice_recognition"
+  ]
+}
