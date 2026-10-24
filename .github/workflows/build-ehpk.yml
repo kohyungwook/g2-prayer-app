@@ -15,15 +15,18 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install EvenHub CLI
-        run: npm install -g @evenrealities/evenhub-cli
+      - name: Create Default Icon
+        run: |
+          # 1x1 투명 PNG 기본 아이콘 생성
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" | base64 -d > icon.png
 
       - name: Build EHPK Package
         run: |
-          npx evenhub-cli build || npx evenhub build || zip -r package.ehpk index.html public/ package.json
+          # Even Hub 규격 필수 파일 압축 (.ehpk)
+          zip -r package.ehpk index.html evenhub.json package.json public/ icon.png
 
       - name: Upload EHPK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: g2-prayer-app-ehpk
-          path: "*.ehpk"
+          path: package.ehpk
