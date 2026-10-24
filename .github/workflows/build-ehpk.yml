@@ -1,0 +1,29 @@
+name: Build EHPK Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install EvenHub CLI
+        run: npm install -g @evenrealities/evenhub-cli
+
+      - name: Build EHPK Package
+        run: |
+          npx evenhub-cli build || npx evenhub build || zip -r package.ehpk index.html public/ package.json
+
+      - name: Upload EHPK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2-prayer-app-ehpk
+          path: "*.ehpk"
